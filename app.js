@@ -32,6 +32,7 @@ app.get("/pokemon/:id", (req, res) => {
     res.send(html);
   }
 });
+//for github
 
 app.get("/pokemon/:id", (req, res) => {
   const id = req.params.id;
