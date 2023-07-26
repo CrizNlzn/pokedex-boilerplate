@@ -1,52 +1,136 @@
-// Imports necessary modules
+require("dotenv").config();
 const express = require("express");
 const morgan = require("morgan");
-const pokeBank = require("./pokeBank");
-
-// Initializes Express application
 const app = express();
+const Sequelize = require("sequelize");
+// const db = require("./db");
+// const pokeBank = require("./pokeBank");
+// const pokeList = require("./views/pokeList");
+// const pokeDetails = require("./views/pokeDetails");
+// const Pokemon = require("./models/Pokemon");
+// const Trainer = require("./models/Trainer");
 
-// Uses Morgan middleware for logging
 app.use(morgan("dev"));
+app.use(express.static(__dirname + "/public"));
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 
-// Defines homepage route
-app.get("/", (req, res) => {
-  const pokemonList = pokeBank.list();
-  let html = "<h1>Pokedex</h1>";
-  pokemonList.forEach((pokemon) => {
-    html += `<p><a href="/pokemon/${pokemon.id}">${pokemon.name}</a></p>`;
-  });
-  res.send(html);
+// 
+const db = new Sequelize(process.env.DATABASE_URL);
+
+const Pokemon = db.define("Pokemon", {
+  name: {
+    type: Sequelize.STRING,
+    allowNull: false,
+  },
+  type: {
+    type: Sequelize.STRING,
+    allowNull: false,
+  },
+  trainer: {
+    type: Sequelize.STRING,
+    allowNull: false,
+  },
+  date: {
+    type: Sequelize.DATE,
+  },
+  image: {
+    type: Sequelize.STRING,
+  },
 });
 
-// Defines Pokemon details route
-app.get("/pokemon/:id", (req, res) => {
-  const pokemon = pokeBank.find(req.params.id);
-  if (!pokemon) {
-    res.status(404).send("Pokemon not found");
-  } else {
-    let html = `<h1>${pokemon.name}</h1>`;
-    html += `<p>Type: ${pokemon.type}</p>`;
-    html += `<p>Trainer: ${pokemon.trainer}</p>`;
-    html += `<p>Date: ${pokemon.date}</p>`;
-    res.send(html);
+const Trainer = db.define("Trainer", {
+  name: {
+    type: Sequelize.STRING,
+    allowNull: false,
+  },
+});
+
+Trainer.hasMany(Pokemon);
+Pokemon.belongsTo(Trainer);
+// 
+
+(async () => {
+  try {
+    await db.sync();
+    console.log("Models synced with database");
+  } catch (error) {
+    console.error(error);
+  }
+})();
+
+// Create a route to get all Pokemon.
+app.get("/pokemon", async (req, res) => {
+  try {
+    const pokemon = await Pokemon.findAll();
+    res.json(pokemon);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
-//for github again
 
-app.get("/pokemon/:id", (req, res) => {
-  const id = req.params.id;
-  const pokemon = find(id);
-  if (!pokemon.id) {
-    // If the post wasn't found, just throw an error
-    throw new Error("Not Found");
+// Create a route to get indiv. Pokemon.
+app.get("/pokemon/:id", async (req, res) => {
+  try {
+    const pokemon = await Pokemon.findByPk(req.params.id);
+    if (pokemon) {
+      res.json(pokemon);
+    } else {
+      res.status(404).send("Pokemon not found");
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
-  // ... Otherwise, send the regular post detail HTML
+});
+
+// Create a route to create a new Pokemon.
+app.post("/pokemon", async (req, res) => {
+  try {
+    const newPokemon = await Pokemon.create(req.body);
+    res.json(newPokemon);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 
-// Starts server
-const PORT = 3000;
+// Create a route to update a Pokemon by ID (just dont use : when filtering)
+app.put("/pokemon/:id", async (req, res) => {
+  try {
+    const pokemon = await Pokemon.findByPk(req.params.id);
+    if (pokemon) {
+      await pokemon.update(req.body);
+      res.json(pokemon);
+    } else {
+      res.status(404).send("Pokemon not found");
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// Create a route to delete a Pokemon by ID
+app.delete("/pokemon/:id", async (req, res) => {
+  try {
+    const pokemon = await Pokemon.findByPk(req.params.id);
+    if (pokemon) {
+      await pokemon.destroy();
+      res.status(204).send();
+    } else {
+      res.status(404).send("Pokemon not found");
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+const PORT = process.env.PORT || 5433;
 app.listen(PORT, () => {
-  console.log(`App listening in port ${PORT}`);
+  console.log(`Server is listening on port ${PORT}`);
 });
+
